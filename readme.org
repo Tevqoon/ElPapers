@@ -1,0 +1,9 @@
+
+
+#+begin_src emacs-lisp
+;;; Works for Emacs 30+
+(use-package elpapers
+  :vc (:url "https://github.com/Tevqoon/ElPapers" :rev :newest)
+  :load-path "lisp")
+#+end_src
+
