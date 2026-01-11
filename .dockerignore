@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+.venv
+venv
+env
+.idea
+.vscode
+*.swp
+*.swo
+*~
+data/
+.DS_Store
+README.md
