@@ -9,10 +9,6 @@ def startup():
     db_manager.connect()
     print("Database connected!")
 
-@app.on_event("shutdown")
-def shutdown():
-    db_manager.close()
-
 # Register routers
 app.include_router(health.router)
 app.include_router(papers.router)
