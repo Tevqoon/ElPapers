@@ -14,8 +14,4 @@ class DatabaseManager:
         if "sources" not in self.db.table_names():
             self.db.create_table("sources", schema=sources_schema, mode="overwrite")
     
-    def close(self):
-        if self.db:
-            self.db.close()
-
 db_manager = DatabaseManager()
