@@ -167,6 +167,21 @@ Call CALLBACK with results."
          (message "✓ API is healthy: %s" data)
        (message "✗ API connection failed: %s" data)))))
 
+(defun elpapers-show-stats ()
+  "Show statistics about the papers database."
+  (interactive)
+  (request
+    (elpapers-api--url "/papers/stats")
+    :type "GET"
+    :parser 'json-read
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (message "Papers DB: %d total"
+                         (alist-get 'total_papers data))))
+    :error (cl-function
+            (lambda (&key error-thrown &allow-other-keys)
+              (message "Failed to get stats: %s" error-thrown)))))
+
 (provide 'elpapers-api)
 
 ;;; elpapers-api.el ends here

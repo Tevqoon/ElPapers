@@ -12,7 +12,21 @@ embedder = embedder
 def vectorize_paper(paper: PaperIngest):
     abstract_vector = embedder.embed(paper.abstract)
     return abstract_vector
+
+@router.get("/stats")
+def get_stats():
+    """Get basic statistics about the papers database."""
+    try:
+        table = db_manager.db.open_table("sources")
+        total_count = table.count_rows()
+        
+        return {
+            "total_papers": total_count
+        }
     
+    except Exception as e:
+        logger.error(f"Error getting stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Stats failed: {str(e)}")    
 
 @router.post("/ingest")
 def ingest_paper(paper: PaperIngest):
@@ -45,6 +59,7 @@ def ingest_paper(paper: PaperIngest):
         # Prepare the record for LanceDB
         record = {
             "id": paper.id,
+            "elfeed_id": paper.elfeed_id,
             "title": paper.title,
             "source_type": paper.source_type,
             "url": paper.url,

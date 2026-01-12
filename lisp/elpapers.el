@@ -111,6 +111,44 @@ Tags successfully ingested entries with '+vectorized'."
            (elfeed-tag entry 'vectorized)))))
     (elfeed-db-save)))
 
+;;; Searching
+
+(defun elpapers-semantic-search (query &optional top-k)
+  "Search for papers semantically similar to QUERY and display in elfeed buffer.
+TOP-K defaults to 20."
+  (interactive "sSearch query: ")
+  (let ((top-k (or top-k 20)))
+    (message "Searching for: %s" query)
+    (elpapers-api-semantic-search
+     query
+     top-k
+     (lambda (success results)
+       (if success
+	   results
+           ;;(elpapers--display-search-results results query)
+         (message "Search failed: %s" results))))))
+
+(defun elpapers--display-search-results (results query)
+  "Display search RESULTS in elfeed buffer with QUERY as filter description."
+  (let* ((entries
+          (delq nil
+                (mapcar (lambda (r)
+                         (let ((elfeed-id (alist-get 'elfeed_id r)))
+                           (when elfeed-id
+			     (message elfeed-id)
+                             (elfeed-db-get-entry elfeed-id))))
+                       results))))
+    
+    (if entries
+        (progn
+          (with-current-buffer (elfeed-search-buffer)
+            (setq elfeed-search-entries entries)
+            (setq elfeed-search-filter (format "semantic: %s" query))
+            (elfeed-search-update t))
+          (switch-to-buffer (elfeed-search-buffer))
+          (message "Found %d results for: %s" (length entries) query))
+      (message "No elfeed entries found for these papers"))))
+
 ;;; Automatic ingestion hook
 
 (defun elpapers-auto-ingest-hook (entry)
