@@ -36,35 +36,34 @@ def ingest_paper(paper: PaperIngest):
     """
     try:
         logger.info("Attempting embed.")
-        abstract_vector = None
-        full_text_vectors = None
+        embeddings = []
         
         # Try to embed abstract
         if paper.abstract:
             try:
                 logger.info(f"Embedding abstract for paper: {paper.id}")
                 abstract_vector = embedder.embed(paper.abstract)
+                embeddings.append(abstract_vector)
             except Exception as e:
                 logger.warning(f"Failed to embed abstract for {paper.id}: {str(e)}")
-        
+
+        # TODO: Add proper chunking for full text inertion
         if paper.full_text:
             try:
                 logger.info(f"Embedding full text for paper: {paper.id}")
         
                 full_text_vector = embedder.embed(paper.full_text)
-                full_text_vectors = [full_text_vector]  # List of one vector
+                embeddings.append(full_text_vector)
         
                 logger.info("Successfully embedded full text as 1 chunk")
             except Exception as e:
                 logger.warning(f"Failed to embed full text for {paper.id}: {str(e)}")
-                full_text_vectors = None
-
        
         # At least one embedding must succeed
-        if abstract_vector is None and full_text_vectors is None:
+        if not embeddings:
             raise HTTPException(
                 status_code=400,
-                detail="Paper must have either abstract or full_text, and at least one must be embeddable"
+                detail="Paper must have either nonempty embeddings list!"
             )
         
         # Prepare the record for LanceDB
@@ -76,18 +75,31 @@ def ingest_paper(paper: PaperIngest):
             "source_type": paper.source_type,
             "url": paper.url,
             "abstract": paper.abstract,
-            "abstract_vector": abstract_vector,
             "full_text": paper.full_text,
-            "full_text_vectors": full_text_vectors
+            "embeddings" : embeddings
         }
         logger.info(f"Successfully prepared a record for paper {paper.id}")
         
         # Insert into the "sources" table
         table = db_manager.db.open_table("sources")
-        table.merge_insert("id") \
-            .when_matched_update_all() \
-            .when_not_matched_insert_all() \
-            .execute([record])
+        # NOTE: LanceDB has a bug with inserting lists of vectors.
+        # table.merge_insert("id") \
+        #     .when_matched_update_all() \
+        #     .when_not_matched_insert_all() \
+        #     .execute([record])
+        # Manually delete and readd the entry:
+
+        # Preserve existing 
+        existing = table.search().where(f"id = '{paper.id}'").limit(1).to_list()
+        if existing:
+            logger.info(f"Replacing existing paper: {paper.id}")
+            table.delete(f"id = '{paper.id}'")
+
+        logger.info(f"Record keys: {record.keys()}")
+        logger.info(f"abstract_vector type: {type(record.get('abstract_vector'))}")
+        logger.info(f"full_text_vectors type: {type(record.get('full_text_vectors'))}")
+            
+        table.add([record])
         
         logger.info(f"Successfully ingested paper: {paper.id}")
         return {

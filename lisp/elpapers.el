@@ -81,6 +81,7 @@ Calls CALLBACK with (success result) when complete."
                      (elfeed_entry_id . ,entry-id)
                      (title . ,title)
                      (abstract . ,(or abstract ""))
+		     (full_text . "")
                      (source_type . "arxiv_elfeed")
                      (url . ,url))))
           (elpapers-api-ingest-paper data callback))

@@ -15,18 +15,19 @@ def semantic_search(query: str, top_k: int = Query(default=10, ge=1, le=100)):
         # Embed the query
         query_vector = embedder.embed(query)
         
-        # Search LanceDB
+        # Search LanceDB - specify which vector column to use
         table = db_manager.db.open_table("sources")
-        results = table.search(query_vector).limit(top_k).to_list()
+        results = table.search(query_vector, vector_column_name="embeddings") \
+                      .limit(top_k) \
+                      .to_list()
         
         return [{
             "id": r["id"],
-            "elfeed_feed_id": r.get("elfeed_feed_id"),    # CHANGED: was elfeed_id
-            "elfeed_entry_id": r.get("elfeed_entry_id"),  # NEW
+            "elfeed_feed_id": r.get("elfeed_feed_id"),
+            "elfeed_entry_id": r.get("elfeed_entry_id"),
             "title": r["title"],
             "similarity_score": r["_distance"]
         } for r in results]
-
         
     except Exception as e:
         logger.error(f"Error in semantic search: {str(e)}")
