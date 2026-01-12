@@ -1,6 +1,16 @@
 from fastapi import FastAPI
 from src.db.connection import db_manager
 from src.api.routes import health, papers, search
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
 
 app = FastAPI()
 
