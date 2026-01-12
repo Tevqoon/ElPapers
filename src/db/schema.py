@@ -10,6 +10,6 @@ sources_schema = pa.schema([
     pa.field("abstract", pa.string(), nullable=True),
     pa.field("abstract_vector", pa.list_(pa.float32(), 1536), nullable=True),
     pa.field("full_text", pa.string(), nullable=True),
-    # FIXME: LanceDB doesn't currently seem to support lists of lists well.
-    # pa.field("full_text_vectors", pa.list_(pa.list_(pa.float32())), nullable=True),
+    # pa.field("full_text_vector", pa.list_(pa.float32(), 1536), nullable=True),
+    pa.field("full_text_vectors", pa.list_(pa.list_(pa.float32(), 1536)), nullable=True),
 ])

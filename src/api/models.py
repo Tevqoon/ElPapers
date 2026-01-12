@@ -15,3 +15,5 @@ class SearchResult(BaseModel):
     id: str
     title: str
     similarity_score: float
+
+    

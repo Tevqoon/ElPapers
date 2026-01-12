@@ -47,7 +47,18 @@ def ingest_paper(paper: PaperIngest):
             except Exception as e:
                 logger.warning(f"Failed to embed abstract for {paper.id}: {str(e)}")
         
-        # TODO: Try to embed full text
+        if paper.full_text:
+            try:
+                logger.info(f"Embedding full text for paper: {paper.id}")
+        
+                full_text_vector = embedder.embed(paper.full_text)
+                full_text_vectors = [full_text_vector]  # List of one vector
+        
+                logger.info("Successfully embedded full text as 1 chunk")
+            except Exception as e:
+                logger.warning(f"Failed to embed full text for {paper.id}: {str(e)}")
+                full_text_vectors = None
+
        
         # At least one embedding must succeed
         if abstract_vector is None and full_text_vectors is None:
@@ -67,7 +78,7 @@ def ingest_paper(paper: PaperIngest):
             "abstract": paper.abstract,
             "abstract_vector": abstract_vector,
             "full_text": paper.full_text,
-            # "full_text_vectors": full_text_vectors,
+            "full_text_vectors": full_text_vectors
         }
         logger.info(f"Successfully prepared a record for paper {paper.id}")
         
