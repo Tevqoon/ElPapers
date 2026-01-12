@@ -121,6 +121,40 @@ PAPER-DATA should be an alist with keys:
             (lambda (&key error-thrown &allow-other-keys)
               (funcall callback nil error-thrown)))))
 
+(defun elpapers-api-ingest-batch (papers-data callback)
+  "Batch ingest PAPERS-DATA into vector database.
+
+PAPERS-DATA should be a list of paper alists with keys:
+  - id: unique paper identifier
+  - title: paper title
+  - abstract: paper abstract
+  - source_type: source type (e.g. \"arxiv\")
+  - url: paper URL (optional)
+  - elfeed_feed_id: elfeed feed ID (optional)
+  - elfeed_entry_id: elfeed entry ID (optional)
+
+Calls CALLBACK with (success result) when complete.
+The API handles chunking of embedding calls automatically."
+  (request
+    (elpapers-api--url "/papers/ingest_batch")
+    :type "POST"
+    :headers '(("Content-Type" . "application/json"))
+    :data (json-encode papers-data)
+    :parser 'json-read
+    :timeout 600  ; 10 minutes for large batches
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (funcall callback t data)))
+    :error (cl-function
+            (lambda (&key error-thrown response &allow-other-keys)
+              (let ((error-msg
+                     (if response
+                         (format "HTTP %d: %s"
+                                 (request-response-status-code response)
+                                 error-thrown)
+                       (format "%s" error-thrown))))
+                (funcall callback nil error-msg))))))
+
 (defun elpapers-api-get-paper (paper-id callback)
   "Retrieve paper by PAPER-ID. Call CALLBACK with result."
   (request
