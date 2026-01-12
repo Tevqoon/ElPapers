@@ -57,7 +57,10 @@ def ingest_paper(paper: PaperIngest):
         
         # Insert into the "sources" table
         table = db_manager.db.open_table("sources")
-        table.add([record])
+        table.merge_insert("id") \
+            .when_matched_update_all() \
+            .when_not_matched_insert_all() \
+            .execute([record])
         
         logger.info(f"Successfully ingested paper: {paper.id}")
         return {

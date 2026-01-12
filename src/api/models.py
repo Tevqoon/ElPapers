@@ -3,6 +3,7 @@ from typing import Optional
 
 class PaperIngest(BaseModel):
     id: str
+    elfeed_id: str = None
     title: str
     abstract: str
     full_text: Optional[str] = None

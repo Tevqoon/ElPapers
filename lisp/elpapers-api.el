@@ -161,6 +161,7 @@ Call CALLBACK with results."
   (interactive)
   (message "Testing ElPapers API connection...")
   (elpapers-api-health-check
+
    (lambda (success data)
      (if success
          (message "✓ API is healthy: %s" data)
