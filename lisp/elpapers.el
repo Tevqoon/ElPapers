@@ -61,9 +61,10 @@ For arXiv URLs, returns the arXiv ID (e.g., '2301.12345v2')."
     (match-string 1 url))
    (t url)))
 
-(defun elpapers-ingest-entry (entry callback)
+(defun elpapers-ingest-entry (entry callback &optional include-fulltext)
   "Ingest ENTRY into the vector database.
-Calls CALLBACK with (success result) when complete."
+Calls CALLBACK with (success result) when complete.
+Passes INCLUDE-FULLTEXT along."
   (let* ((url (elfeed-entry-link entry))
          (title (elfeed-entry-title entry))
          (elfeed-id (elfeed-entry-id entry))
@@ -84,17 +85,18 @@ Calls CALLBACK with (success result) when complete."
 		     (full_text . "")
                      (source_type . "arxiv_elfeed")
                      (url . ,url))))
-          (elpapers-api-ingest-paper data callback))
+          (elpapers-api-ingest-paper data callback include-fulltext))
       (funcall callback nil "No URL or title"))))
 
 ;;; Interactive functions
 
-(defun elpapers-ingest-entries (&optional entries)
+(defun elpapers-ingest-entries (&optional entries include-fulltext)
   "Ingest selected elfeed entries into vector database.
 If ENTRIES is provided, use those instead of the selected entries.
 In show mode: ingests current entry.
 In search mode: ingests all selected entries.
-Tags successfully ingested entries with '+vectorized'."
+Tags successfully ingested entries with '+vectorized'.
+Passes INCLUDE-FULLTEXT along. Note that only itemr with '+papers' tag are considered for fulltext."
   (interactive)
   (let ((entries
          (cond
@@ -107,88 +109,76 @@ Tags successfully ingested entries with '+vectorized'."
 
     (message "Ingesting %d entries..." (length entries))
     (dolist (entry entries)
-      (elpapers-ingest-entry
-       entry
-       (lambda (success _result)
-         (when success
-           (message "✓ Vectorized: %s" (elfeed-entry-title entry))
-           (elfeed-tag entry 'vectorized)))))
+      (let ((tags (elfeed-entry-tags entry)))
+	(elpapers-ingest-entry
+	 entry
+	 (lambda (success _result)
+           (when success
+             (elfeed-tag entry 'vectorized)
+	     (if (and (member 'papers tags)
+		      include-fulltext)
+		 (progn
+		   (message "✓ Full-text Vectorized: %s" (elfeed-entry-title entry))
+		   (elfeed-tag entry 'full-vectorized))
+	       (message "✓ Vectorized: %s" (elfeed-entry-title entry))
+	       )
+	     ))
+	 (and (member 'papers tags)
+	      include-fulltext)
+	 )))
     (elfeed-db-save)))
 
-(defun elpapers-ingest-batch (&optional force)
+(defun elpapers-ingest-full ()
+  "Wrapper for elpaper-ingest-entries to automatically"
+  (interactive)
+  (elpapers-ingest-entries nil t))
+
+(defun elpapers-ingest-batch ()
   "Batch ingest entries into vector database (abstracts only).
-With prefix arg FORCE, re-ingest already-vectorized entries.
-
-This sends all entries in a single API call. The server handles
-chunking of OpenAI API calls automatically for efficiency."
-  (interactive "P")
-  (let* ((entries (cond
-                   ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
-                   ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
-                   (t (user-error "Not in an Elfeed buffer"))))
-         ;; Filter by vectorized tag unless forcing
-         (to-ingest
-          (if force
-              entries
-            (cl-remove-if
-             (lambda (e) (memq 'vectorized (elfeed-entry-tags e)))
-             entries))))
+Sends all selected entries in a single API call."
+  (interactive)
+  (let ((entries (cond
+                  ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+                  ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+                  (t (user-error "Not in an Elfeed buffer")))))
     
-    (if (null to-ingest)
-        (message "No entries to ingest (all already vectorized)")
+    (when (null entries)
+      (user-error "No entries selected"))
+    
+    (message "Preparing %d entries for batch ingestion..." (length entries))
+    
+    ;; Convert to API format
+    (let ((papers-data
+           (mapcar
+            (lambda (entry)
+              (let* ((url (elfeed-entry-link entry))
+                     (elfeed-id (elfeed-entry-id entry))
+                     (paper-id (elpapers-extract-paper-id url))
+                     (content (elfeed-entry-content entry))
+                     (abstract (if (elfeed-ref-p content)
+                                   (elfeed-deref content)
+                                 content)))
+                `((id . ,paper-id)
+                  (elfeed_feed_id . ,(car elfeed-id))
+                  (elfeed_entry_id . ,(cdr elfeed-id))
+                  (title . ,(elfeed-entry-title entry))
+                  (abstract . ,(or abstract ""))
+                  (full_text . "")
+                  (source_type . "arxiv_elfeed")
+                  (url . ,url))))
+            entries)))
       
-      (message "Preparing %d entries for batch ingestion..." (length to-ingest))
-      
-      ;; Convert to API format
-      (let ((papers-data
-             (mapcar
-              (lambda (entry)
-                (let* ((url (elfeed-entry-link entry))
-                       (elfeed-id (elfeed-entry-id entry))
-                       (paper-id (elpapers-extract-paper-id url))
-                       (content (elfeed-entry-content entry))
-                       (abstract (if (elfeed-ref-p content)
-                                     (elfeed-deref content)
-                                   content)))
-                  `((id . ,paper-id)
-                    (elfeed_feed_id . ,(car elfeed-id))
-                    (elfeed_entry_id . ,(cdr elfeed-id))
-                    (title . ,(elfeed-entry-title entry))
-                    (abstract . ,(or abstract ""))
-                    (full_text . "")
-                    (source_type . "arxiv_elfeed")
-                    (url . ,url))))
-              to-ingest)))
-        
-        ;; Single API call for all papers
-        (message "Sending batch request for %d papers..." (length papers-data))
-        (elpapers-api-ingest-batch
-         papers-data
-         (lambda (success result)
-           (if success
-               (let* ((succeeded (alist-get 'succeeded result))
-                      (failed (alist-get 'failed result))
-                      (results-list (alist-get 'results result)))
-                 
-                 (message "Batch response: %d succeeded, %d failed" succeeded failed)
-                 
-                 ;; Tag successful entries
-                 (dolist (entry to-ingest)
-                   (let* ((url (elfeed-entry-link entry))
-                          (paper-id (elpapers-extract-paper-id url))
-                          (paper-result (cl-find paper-id results-list
-                                                 :key (lambda (r) (alist-get 'paper_id r))
-                                                 :test #'string=)))
-                     (when (and paper-result
-                                (string= (alist-get 'status paper-result) "success"))
-                       (elfeed-tag entry 'vectorized))))
-                 
-                 (elfeed-db-save)
-                 (message "✓ Batch ingestion complete: %d succeeded, %d failed"
-                          succeeded failed))
-             
-             (message "✗ Batch ingestion failed: %s" result))))))))
-
+      ;; Single API call for all papers
+      (message "Sending batch request for %d papers..." (length papers-data))
+      (elpapers-api-ingest-batch
+       papers-data
+       (lambda (success result)
+         (if success
+             (let ((succeeded (alist-get 'succeeded result))
+                   (failed (alist-get 'failed result)))
+               (message "✓ Batch ingestion complete: %d succeeded, %d failed"
+                        succeeded failed))
+           (message "✗ Batch ingestion failed: %s" result)))))))
 
 ;;; Searching
 

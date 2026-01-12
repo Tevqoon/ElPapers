@@ -85,7 +85,7 @@ def ingest_paper(paper: PaperIngest, include_fulltext: bool = False):
                 logger.info(f"Successfully embedded full text as {len(chunks)} chunk(s).")
             except Exception as e:
                 logger.warning(f"Failed to embed full text for {paper.id}: {str(e)}")
-        elif (include_fulltext):
+        elif include_fulltext:
             logger.info(f"Attempting full text extraction for {paper.id}")
             chunks = chunk_by_paper_id(paper.id)
             

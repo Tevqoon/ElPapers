@@ -97,7 +97,7 @@
 
 ;;; Paper ingestion endpoints
 
-(defun elpapers-api-ingest-paper (paper-data callback)
+(defun elpapers-api-ingest-paper (paper-data callback &optional include-fulltext)
   "Ingest PAPER-DATA into vector database. Call CALLBACK with result.
 
 PAPER-DATA should be an alist with keys:
@@ -106,9 +106,13 @@ PAPER-DATA should be an alist with keys:
   - abstract: paper abstract
   - source_type: source type (e.g. \"arxiv\")
   - url: paper URL (optional)
-  - full_text: full paper text (optional)"
+  - full_text: full paper text (optional)
+
+INCLUDE-FULLTEXT passes along if we want to import the whole text as well."
   (request
-    (elpapers-api--url "/papers/ingest")
+    (elpapers-api--url (if include-fulltext
+			   "/papers/ingest?include-fulltext=true"
+			   "/papers/ingest"))
     :type "POST"
     :headers '(("Content-Type" . "application/json"))
     :data (json-encode paper-data)
