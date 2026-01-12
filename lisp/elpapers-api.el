@@ -111,7 +111,7 @@ PAPER-DATA should be an alist with keys:
 INCLUDE-FULLTEXT passes along if we want to import the whole text as well."
   (request
     (elpapers-api--url (if include-fulltext
-			   "/papers/ingest?include-fulltext=true"
+			   "/papers/ingest?include_fulltext=true"
 			   "/papers/ingest"))
     :type "POST"
     :headers '(("Content-Type" . "application/json"))

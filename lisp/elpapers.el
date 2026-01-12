@@ -82,8 +82,7 @@ Passes INCLUDE-FULLTEXT along."
                      (elfeed_entry_id . ,entry-id)
                      (title . ,title)
                      (abstract . ,(or abstract ""))
-		     (full_text . "")
-                     (source_type . "arxiv_elfeed")
+                     (source_type . "arxiv")
                      (url . ,url))))
           (elpapers-api-ingest-paper data callback include-fulltext))
       (funcall callback nil "No URL or title"))))
@@ -91,42 +90,58 @@ Passes INCLUDE-FULLTEXT along."
 ;;; Interactive functions
 
 (defun elpapers-ingest-entries (&optional entries include-fulltext)
-  "Ingest selected elfeed entries into vector database.
-If ENTRIES is provided, use those instead of the selected entries.
-In show mode: ingests current entry.
-In search mode: ingests all selected entries.
-Tags successfully ingested entries with '+vectorized'.
-Passes INCLUDE-FULLTEXT along. Note that only itemr with '+papers' tag are considered for fulltext."
-  (interactive)
-  (let ((entries
-         (cond
-          (entries entries)
-          ((derived-mode-p 'elfeed-show-mode)
-           (list elfeed-show-entry))
-          ((derived-mode-p 'elfeed-search-mode)
-           (elfeed-search-selected))
-          (t (user-error "Not in an Elfeed buffer")))))
+  "Ingest selected elfeed ENTRIES into vector database.
+
+With prefix argument (C-u), force full-text vectorization even if
+'+full-vectorized' is already present.
+
+When INCLUDE-FULLTEXT is true, also signal fulltext ingestion."
+  (interactive
+   (list nil current-prefix-arg))
+
+  (let* ((entries
+          (cond
+           (entries entries)
+           ((derived-mode-p 'elfeed-show-mode)
+            (list elfeed-show-entry))
+           ((derived-mode-p 'elfeed-search-mode)
+            (elfeed-search-selected))
+           (t (user-error "Not in an Elfeed buffer"))))
+
+         ;; Force overrides everything
+         (force-fulltext include-fulltext))
 
     (message "Ingesting %d entries..." (length entries))
+
     (dolist (entry entries)
-      (let ((tags (elfeed-entry-tags entry)))
-	(elpapers-ingest-entry
-	 entry
-	 (lambda (success _result)
+      ;; Snapshot tags *once*
+      (let* ((tags (elfeed-entry-tags entry))
+             (has-papers (memq 'papers tags))
+             (already-full (memq 'full-vectorized tags))
+             ;; Decide intent BEFORE async call
+             (do-fulltext (and has-papers
+                               (or force-fulltext
+                                   (not already-full)))))
+
+        (elpapers-ingest-entry
+         entry
+         (lambda (success _result)
            (when success
+             ;; Always mark vectorized
              (elfeed-tag entry 'vectorized)
-	     (if (and (member 'papers tags)
-		      include-fulltext)
-		 (progn
-		   (message "✓ Full-text Vectorized: %s" (elfeed-entry-title entry))
-		   (elfeed-tag entry 'full-vectorized))
-	       (message "✓ Vectorized: %s" (elfeed-entry-title entry))
-	       )
-	     ))
-	 (and (member 'papers tags)
-	      include-fulltext)
-	 )))
+
+             (when do-fulltext
+               (elfeed-tag entry 'full-vectorized)
+               (message "✓ Full-text vectorized: %s"
+                        (elfeed-entry-title entry)))
+
+             (unless do-fulltext
+               (message "✓ Vectorized: %s"
+                        (elfeed-entry-title entry)))))
+         do-fulltext)))
+
     (elfeed-db-save)))
+
 
 (defun elpapers-ingest-full ()
   "Wrapper for elpaper-ingest-entries to automatically"
@@ -163,7 +178,6 @@ Sends all selected entries in a single API call."
                   (elfeed_entry_id . ,(cdr elfeed-id))
                   (title . ,(elfeed-entry-title entry))
                   (abstract . ,(or abstract ""))
-                  (full_text . "")
                   (source_type . "arxiv_elfeed")
                   (url . ,url))))
             entries)))

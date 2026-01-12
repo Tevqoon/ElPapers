@@ -32,3 +32,4 @@ def semantic_search(query: str, top_k: int = Query(default=10, ge=1, le=100)):
     except Exception as e:
         logger.error(f"Error in semantic search: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
