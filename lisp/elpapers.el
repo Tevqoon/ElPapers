@@ -67,6 +67,8 @@ Calls CALLBACK with (success result) when complete."
   (let* ((url (elfeed-entry-link entry))
          (title (elfeed-entry-title entry))
          (elfeed-id (elfeed-entry-id entry))
+         (feed-id (car elfeed-id))
+         (entry-id (cdr elfeed-id))
          (paper-id (elpapers-extract-paper-id url))
          (content (elfeed-entry-content entry))
          (abstract (if (elfeed-ref-p content)
@@ -75,7 +77,8 @@ Calls CALLBACK with (success result) when complete."
 
     (if (and url title)
         (let ((data `((id . ,(format "%s" paper-id))
-                     (elfeed_id . ,(format "%s" elfeed-id))
+                     (elfeed_feed_id . ,feed-id)
+                     (elfeed_entry_id . ,entry-id)
                      (title . ,title)
                      (abstract . ,(or abstract ""))
                      (source_type . "arxiv_elfeed")
@@ -124,28 +127,61 @@ TOP-K defaults to 20."
      top-k
      (lambda (success results)
        (if success
-	   results
-           ;;(elpapers--display-search-results results query)
+           (elpapers--display-search-results results query)
          (message "Search failed: %s" results))))))
 
 (defun elpapers--display-search-results (results query)
   "Display search RESULTS in elfeed buffer with QUERY as filter description."
-  (let* ((entries
+  (let* ((results-list (append results nil))
+         (entries
           (delq nil
                 (mapcar (lambda (r)
-                         (let ((elfeed-id (alist-get 'elfeed_id r)))
-                           (when elfeed-id
-			     (message elfeed-id)
-                             (elfeed-db-get-entry elfeed-id))))
-                       results))))
+                          (let ((feed-id (cdr (assq 'elfeed_feed_id r)))
+                                (entry-id (cdr (assq 'elfeed_entry_id r))))
+                            (when (and feed-id entry-id)
+                              (let* ((elfeed-id (cons feed-id entry-id))
+                                     (entry (elfeed-db-get-entry elfeed-id)))
+                                (unless entry
+                                  (message "Entry not found for ID: %S" elfeed-id))
+                                entry))))
+                        results-list))))
     
     (if entries
         (progn
           (with-current-buffer (elfeed-search-buffer)
+	    ;; (setq elfeed-search-filter "")
+	    ;; (elfeed-search-update t)
+            (setq elfeed-search-entries entries)
+	    )
+          (switch-to-buffer (elfeed-search-buffer))
+          (message "Found %d results for: %s" (length entries) query))
+      (message "No elfeed entries found for these papers"))))
+
+(defun elpapers--display-search-results (results query)
+  "Display search RESULTS in elfeed buffer with QUERY as filter description."
+  (let* ((results-list (append results nil))
+         (entries
+          (delq nil
+                (mapcar (lambda (r)
+                          (let ((feed-id (cdr (assq 'elfeed_feed_id r)))
+                                (entry-id (cdr (assq 'elfeed_entry_id r))))
+                            (when (and feed-id entry-id)
+                              (let* ((elfeed-id (cons feed-id entry-id))
+                                     (entry (elfeed-db-get-entry elfeed-id)))
+                                entry))))
+                        results-list))))
+    
+    (if entries
+        (with-current-buffer (elfeed-search-buffer)
+          (let ((inhibit-read-only t))
+            (erase-buffer)
             (setq elfeed-search-entries entries)
             (setq elfeed-search-filter (format "semantic: %s" query))
-            (elfeed-search-update t))
-          (switch-to-buffer (elfeed-search-buffer))
+            (dolist (entry entries)
+              (funcall elfeed-search-print-entry-function entry)
+              (insert "\n")))
+          (goto-char (point-min))
+          (switch-to-buffer (current-buffer))
           (message "Found %d results for: %s" (length entries) query))
       (message "No elfeed entries found for these papers"))))
 

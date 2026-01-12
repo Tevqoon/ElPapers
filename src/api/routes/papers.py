@@ -59,7 +59,8 @@ def ingest_paper(paper: PaperIngest):
         # Prepare the record for LanceDB
         record = {
             "id": paper.id,
-            "elfeed_id": paper.elfeed_id,
+            "elfeed_feed_id": paper.elfeed_feed_id,
+            "elfeed_entry_id": paper.elfeed_entry_id,
             "title": paper.title,
             "source_type": paper.source_type,
             "url": paper.url,

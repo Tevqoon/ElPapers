@@ -21,10 +21,12 @@ def semantic_search(query: str, top_k: int = Query(default=10, ge=1, le=100)):
         
         return [{
             "id": r["id"],
-            "elfeed_id": r.get("elfeed_id"),
+            "elfeed_feed_id": r.get("elfeed_feed_id"),    # CHANGED: was elfeed_id
+            "elfeed_entry_id": r.get("elfeed_entry_id"),  # NEW
             "title": r["title"],
             "similarity_score": r["_distance"]
         } for r in results]
+
         
     except Exception as e:
         logger.error(f"Error in semantic search: {str(e)}")
