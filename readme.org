@@ -1,4 +1,5 @@
-
+#+title: ElPapers
+#+subtitle: An Elfeed-first vectorization and RAG system for discovery
 
 #+begin_src emacs-lisp
 ;;; Works for Emacs 30+
