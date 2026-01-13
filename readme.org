@@ -26,6 +26,7 @@ GET    /papers/allpapers           # List all papers
 #+begin_src 
 
 GET    /search/semantic            # Semantic similarity search
+GET    /search/similar/{paper_id}  # Find similar papers
 
 #+end_src
 
