@@ -65,6 +65,9 @@ For arXiv URLs, returns the arXiv ID (e.g., '2301.12345v2')."
   "Ingest ENTRY into the vector database.
 Calls CALLBACK with (success result) when complete.
 Passes INCLUDE-FULLTEXT along."
+  (unless callback
+    (error "elpapers-ingest-entry called without callback"))
+  
   (let* ((url (elfeed-entry-link entry))
          (title (elfeed-entry-title entry))
          (elfeed-id (elfeed-entry-id entry))
@@ -74,7 +77,8 @@ Passes INCLUDE-FULLTEXT along."
          (content (elfeed-entry-content entry))
          (abstract (if (elfeed-ref-p content)
                       (elfeed-deref content)
-                    content)))
+                    content))
+         (cb callback))
 
     (if (and url title)
         (let ((data `((id . ,(format "%s" paper-id))
@@ -84,8 +88,8 @@ Passes INCLUDE-FULLTEXT along."
                      (abstract . ,(or abstract ""))
                      (source_type . "arxiv")
                      (url . ,url))))
-          (elpapers-api-ingest-paper data callback include-fulltext))
-      (funcall callback nil "No URL or title"))))
+          (elpapers-api-ingest-paper data cb include-fulltext))
+      (funcall cb nil "No URL or title"))))
 
 ;;; Interactive functions
 
@@ -114,8 +118,9 @@ When INCLUDE-FULLTEXT is true, also signal fulltext ingestion."
     (message "Ingesting %d entries..." (length entries))
 
     (dolist (entry entries)
-      ;; Snapshot tags *once*
-      (let* ((tags (elfeed-entry-tags entry))
+      ;; Snapshot tags *once* and capture entry in closure
+      (let* ((current-entry entry)
+             (tags (elfeed-entry-tags entry))
              (has-papers (memq 'papers tags))
              (already-full (memq 'full-vectorized tags))
              ;; Decide intent BEFORE async call
@@ -128,16 +133,16 @@ When INCLUDE-FULLTEXT is true, also signal fulltext ingestion."
          (lambda (success _result)
            (when success
              ;; Always mark vectorized
-             (elfeed-tag entry 'vectorized)
+             (elfeed-tag current-entry 'vectorized)
 
              (when do-fulltext
-               (elfeed-tag entry 'full-vectorized)
+               (elfeed-tag current-entry 'full-vectorized)
                (message "✓ Full-text vectorized: %s"
-                        (elfeed-entry-title entry)))
+                        (elfeed-entry-title current-entry)))
 
              (unless do-fulltext
                (message "✓ Vectorized: %s"
-                        (elfeed-entry-title entry)))))
+                        (elfeed-entry-title current-entry)))))
          do-fulltext)))
 
     (elfeed-db-save)))
@@ -162,25 +167,26 @@ Sends all selected entries in a single API call."
     
     (message "Preparing %d entries for batch ingestion..." (length entries))
     
-    ;; Convert to API format
-    (let ((papers-data
-           (mapcar
-            (lambda (entry)
-              (let* ((url (elfeed-entry-link entry))
-                     (elfeed-id (elfeed-entry-id entry))
-                     (paper-id (elpapers-extract-paper-id url))
-                     (content (elfeed-entry-content entry))
-                     (abstract (if (elfeed-ref-p content)
-                                   (elfeed-deref content)
-                                 content)))
-                `((id . ,paper-id)
-                  (elfeed_feed_id . ,(car elfeed-id))
-                  (elfeed_entry_id . ,(cdr elfeed-id))
-                  (title . ,(elfeed-entry-title entry))
-                  (abstract . ,(or abstract ""))
-                  (source_type . "arxiv_elfeed")
-                  (url . ,url))))
-            entries)))
+    ;; Convert to API format and capture entries in closure
+    (let* ((entries-snapshot entries)
+           (papers-data
+            (mapcar
+             (lambda (entry)
+               (let* ((url (elfeed-entry-link entry))
+                      (elfeed-id (elfeed-entry-id entry))
+                      (paper-id (elpapers-extract-paper-id url))
+                      (content (elfeed-entry-content entry))
+                      (abstract (if (elfeed-ref-p content)
+                                    (elfeed-deref content)
+                                  content)))
+                 `((id . ,paper-id)
+                   (elfeed_feed_id . ,(car elfeed-id))
+                   (elfeed_entry_id . ,(cdr elfeed-id))
+                   (title . ,(elfeed-entry-title entry))
+                   (abstract . ,(or abstract ""))
+                   (source_type . "arxiv_elfeed")
+                   (url . ,url))))
+             entries)))
       
       ;; Single API call for all papers
       (message "Sending batch request for %d papers..." (length papers-data))
@@ -190,6 +196,10 @@ Sends all selected entries in a single API call."
          (if success
              (let ((succeeded (alist-get 'succeeded result))
                    (failed (alist-get 'failed result)))
+               ;; Tag all entries as vectorized on success
+               (dolist (entry entries-snapshot)
+                 (elfeed-tag entry 'vectorized))
+               (elfeed-db-save)
                (message "✓ Batch ingestion complete: %d succeeded, %d failed"
                         succeeded failed))
            (message "✗ Batch ingestion failed: %s" result)))))))
@@ -200,15 +210,13 @@ Sends all selected entries in a single API call."
   "Search for papers semantically similar to QUERY and display in elfeed buffer.
 TOP-K defaults to 20."
   (interactive "sSearch query: ")
-  (let ((top-k (or top-k 20)))
+  (let ((top-k (or top-k 100))
+        (cb (lambda (success results)
+              (if success
+                  (elpapers--display-search-results results query)
+                (message "Search failed: %s" results)))))
     (message "Searching for: %s" query)
-    (elpapers-api-semantic-search
-     query
-     top-k
-     (lambda (success results)
-       (if success
-           (elpapers--display-search-results results query)
-         (message "Search failed: %s" results))))))
+    (elpapers-api-semantic-search query top-k cb)))
 
 (defun elpapers--display-search-results (results query)
   "Display search RESULTS in elfeed buffer with QUERY as filter description."
@@ -243,7 +251,8 @@ TOP-K defaults to 20."
 (defun elpapers-auto-ingest-hook (entry)
   "Automatically ingest ENTRY if tagged with configured tags.
 Add to `elfeed-new-entry-hook' for automatic operation."
-  (let ((tags (elfeed-entry-tags entry)))
+  (let ((tags (elfeed-entry-tags entry))
+        (current-entry entry))
     (when (and (seq-some (lambda (tag) (memq tag tags))
                         elpapers-auto-ingest-tags)
               (not (memq 'vectorized tags)))
@@ -251,7 +260,7 @@ Add to `elfeed-new-entry-hook' for automatic operation."
        entry
        (lambda (success _result)
          (when success
-           (elfeed-tag entry 'vectorized)
+           (elfeed-tag current-entry 'vectorized)
            (elfeed-db-save)))))))
 
 (defun elpapers-enable-auto-ingest ()

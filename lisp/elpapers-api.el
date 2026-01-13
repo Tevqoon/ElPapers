@@ -69,31 +69,37 @@
 
 (defun elpapers-api-health-check (callback)
   "Check API health status. Call CALLBACK with result."
-  (request
-    (elpapers-api--url "/health")
-    :type "GET"
-    :parser 'json-read
-    :timeout elpapers-api-timeout
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall callback t data)))
-    :error (cl-function
-            (lambda (&key error-thrown &allow-other-keys)
-              (funcall callback nil error-thrown)))))
+  (unless callback
+    (error "elpapers-api-health-check called without callback"))
+  (let ((cb callback))
+    (request
+      (elpapers-api--url "/health")
+      :type "GET"
+      :parser 'json-read
+      :timeout elpapers-api-timeout
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown &allow-other-keys)
+                (funcall cb nil error-thrown))))))
 
 (defun elpapers-api-list-tables (callback)
   "List available database tables. Call CALLBACK with result."
-  (request
-    (elpapers-api--url "/tables")
-    :type "GET"
-    :parser 'json-read
-    :timeout elpapers-api-timeout
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall callback t data)))
-    :error (cl-function
-            (lambda (&key error-thrown &allow-other-keys)
-              (funcall callback nil error-thrown)))))
+  (unless callback
+    (error "elpapers-api-list-tables called without callback"))
+  (let ((cb callback))
+    (request
+      (elpapers-api--url "/tables")
+      :type "GET"
+      :parser 'json-read
+      :timeout elpapers-api-timeout
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown &allow-other-keys)
+                (funcall cb nil error-thrown))))))
 
 ;;; Paper ingestion endpoints
 
@@ -109,21 +115,24 @@ PAPER-DATA should be an alist with keys:
   - full_text: full paper text (optional)
 
 INCLUDE-FULLTEXT passes along if we want to import the whole text as well."
-  (request
-    (elpapers-api--url (if include-fulltext
-			   "/papers/ingest?include_fulltext=true"
-			   "/papers/ingest"))
-    :type "POST"
-    :headers '(("Content-Type" . "application/json"))
-    :data (json-encode paper-data)
-    :parser 'json-read
-    :timeout elpapers-api-timeout
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall callback t data)))
-    :error (cl-function
-            (lambda (&key error-thrown &allow-other-keys)
-              (funcall callback nil error-thrown)))))
+  (unless callback
+    (error "elpapers-api-ingest-paper called without callback"))
+  (let ((cb callback))
+    (request
+      (elpapers-api--url (if include-fulltext
+                             "/papers/ingest?include_fulltext=true"
+                           "/papers/ingest"))
+      :type "POST"
+      :headers '(("Content-Type" . "application/json"))
+      :data (json-encode paper-data)
+      :parser 'json-read
+      :timeout elpapers-api-timeout
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown &allow-other-keys)
+                (funcall cb nil error-thrown))))))
 
 (defun elpapers-api-ingest-batch (papers-data callback)
   "Batch ingest PAPERS-DATA into vector database.
@@ -139,58 +148,67 @@ PAPERS-DATA should be a list of paper alists with keys:
 
 Calls CALLBACK with (success result) when complete.
 The API handles chunking of embedding calls automatically."
-  (request
-    (elpapers-api--url "/papers/ingest_batch")
-    :type "POST"
-    :headers '(("Content-Type" . "application/json"))
-    :data (json-encode papers-data)
-    :parser 'json-read
-    :timeout 600  ; 10 minutes for large batches
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall callback t data)))
-    :error (cl-function
-            (lambda (&key error-thrown response &allow-other-keys)
-              (let ((error-msg
-                     (if response
-                         (format "HTTP %d: %s"
-                                 (request-response-status-code response)
-                                 error-thrown)
-                       (format "%s" error-thrown))))
-                (funcall callback nil error-msg))))))
+  (unless callback
+    (error "elpapers-api-ingest-batch called without callback"))
+  (let ((cb callback))
+    (request
+      (elpapers-api--url "/papers/ingest_batch")
+      :type "POST"
+      :headers '(("Content-Type" . "application/json"))
+      :data (json-encode papers-data)
+      :parser 'json-read
+      :timeout 600  ; 10 minutes for large batches
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown response &allow-other-keys)
+                (let ((error-msg
+                       (if response
+                           (format "HTTP %d: %s"
+                                   (request-response-status-code response)
+                                   error-thrown)
+                         (format "%s" error-thrown))))
+                  (funcall cb nil error-msg)))))))
 
 (defun elpapers-api-get-paper (paper-id callback)
   "Retrieve paper by PAPER-ID. Call CALLBACK with result."
-  (request
-    (elpapers-api--url (format "/papers/%s" paper-id))
-    :type "GET"
-    :parser 'json-read
-    :timeout elpapers-api-timeout
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall callback t data)))
-    :error (cl-function
-            (lambda (&key error-thrown &allow-other-keys)
-              (funcall callback nil error-thrown)))))
+  (unless callback
+    (error "elpapers-api-get-paper called without callback"))
+  (let ((cb callback))
+    (request
+      (elpapers-api--url (format "/papers/%s" paper-id))
+      :type "GET"
+      :parser 'json-read
+      :timeout elpapers-api-timeout
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown &allow-other-keys)
+                (funcall cb nil error-thrown))))))
 
 ;;; Search endpoints
 
 (defun elpapers-api-semantic-search (query top-k callback)
   "Perform semantic search with QUERY, returning TOP-K results.
 Call CALLBACK with results."
-  (request
-    (elpapers-api--url "/search/semantic")
-    :type "GET"
-    :params `(("query" . ,query)
-              ("top_k" . ,(number-to-string top-k)))
-    :parser 'json-read
-    :timeout elpapers-api-timeout
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall callback t data)))
-    :error (cl-function
-            (lambda (&key error-thrown &allow-other-keys)
-              (funcall callback nil error-thrown)))))
+  (unless callback
+    (error "elpapers-api-semantic-search called without callback"))
+  (let ((cb callback))
+    (request
+      (elpapers-api--url "/search/semantic")
+      :type "GET"
+      :params `(("query" . ,query)
+                ("top_k" . ,(number-to-string top-k)))
+      :parser 'json-read
+      :timeout elpapers-api-timeout
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown &allow-other-keys)
+                (funcall cb nil error-thrown))))))
 
 ;;; Interactive test functions
 
@@ -199,7 +217,6 @@ Call CALLBACK with results."
   (interactive)
   (message "Testing ElPapers API connection...")
   (elpapers-api-health-check
-
    (lambda (success data)
      (if success
          (message "✓ API is healthy: %s" data)
@@ -208,17 +225,21 @@ Call CALLBACK with results."
 (defun elpapers-show-stats ()
   "Show statistics about the papers database."
   (interactive)
-  (request
-    (elpapers-api--url "/papers/stats")
-    :type "GET"
-    :parser 'json-read
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (message "Papers DB: %d total"
-                         (alist-get 'total_papers data))))
-    :error (cl-function
-            (lambda (&key error-thrown &allow-other-keys)
-              (message "Failed to get stats: %s" error-thrown)))))
+  (let ((cb (lambda (success data)
+              (if success
+                  (message "Papers DB: %d total"
+                           (alist-get 'total_papers data))
+                (message "Failed to get stats: %s" data)))))
+    (request
+      (elpapers-api--url "/papers/stats")
+      :type "GET"
+      :parser 'json-read
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                  (funcall cb t data)))
+      :error (cl-function
+              (lambda (&key error-thrown &allow-other-keys)
+                (funcall cb nil error-thrown))))))
 
 (provide 'elpapers-api)
 
