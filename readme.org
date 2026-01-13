@@ -9,7 +9,6 @@ ElPapers is an Elfeed-first vectorization system designed for automatic ingestio
 - Full-text support - vectorize complete paper texts using arXiv's HTML5 output for deeper semantic matching.
 - Elfeed integration. Search results appear as native Elfeed search.
 - MCP integration.
-
 * API Endpoints
 ** Papers management
 #+begin_src
@@ -25,30 +24,25 @@ GET    /papers/allpapers           # List all papers
 GET    /search/semantic            # Semantic similarity search
 GET    /search/similar/{paper_id}  # Find similar papers
 #+end_src
-
 * Setup
 ** Requirements
 - Docker + docker-compose
 - Emacs 30.1+
 - OpenAI API key (for embeddings)
-
 ** Installation
 1. Clone the repository:
     #+begin_src bash
     git clone https://github.com/Tevqoon/ElPapers
     cd ElPapers
     #+end_src
-
 2. Configure your OpenAI key:
     #+begin_src bash
     export OPENAI_API_KEY=your-key-here
     #+end_src
-
 3. Start the service:
     #+begin_src bash
     docker-compose up -d
     #+end_src
-
 4. Add to your Emacs config:
     #+begin_src emacs-lisp
     (use-package elpapers
@@ -65,44 +59,35 @@ GET    /search/similar/{paper_id}  # Find similar papers
       ;; Enable automatic ingestion for new papers
       (elpapers-enable-auto-ingest))
     #+end_src
-
 ** Usage
 *** Ingesting papers
 Tag Elfeed entries with =+papers= for automatic ingestion, or manually:
 - =M-x elpapers-ingest-entries= - ingest selected entries (abstracts only)
 - =M-x elpapers-ingest-full= - ingest with full-text vectorization
 - =M-x elpapers-ingest-batch= - batch process selected entries
-
 *** Searching
 - =M-x elpapers-semantic-search= - query by topic/concept
 - Results appear in native Elfeed buffer
 - Works across your entire ingested corpus
-
 * Architecture
 ** Backend (Python + FastAPI)
 - LanceDB for vector storage (local-first)
 - OpenAI embeddings (text-embedding-3-small)
 - Async batch processing for efficiency
-
 ** Frontend (Emacs Lisp)
 - =elpapers-api.el= - HTTP client wrapper
 - =elpapers.el= - Elfeed integration
 - Callback-based async operations
-
 ** MCP Server
 - Semantic search from Claude Desktop
 - Paper metadata retrieval
 - Database statistics
-
 * Roadmap
 ** Semantic slicing via HTML arXiv
 Currently full-text vectorization chunks by paragraph boundaries. Next phase: parse HTML5 arXiv output into semantic sections (Introduction, Methods, Results, etc.) for section-aware retrieval.
-
 ** Org-roam schema integration
 The system is general enough to allow for multiple tables. A table with vectorized notes means we can query even more. Enable semantic queries spanning both papers and personal notes. Possibility of integrating a graph database as well for tracking the connections themselves as well.
-
 ** General Elfeed vectorization
 Extend beyond academic papers to arbitrary RSS content. Vector-search across blog posts, news articles, and any feed Elfeed tracks. I especially want to try youtube transcripts.
-
 * License
 GPL-3.0 (derivative of Elfeed)
