@@ -13,21 +13,17 @@ ElPapers is an Elfeed-first vectorization system designed for automatic ingestio
 * API Endpoints
 ** Papers management
 #+begin_src
-
 POST   /papers/ingest              # Single paper ingestion
 POST   /papers/ingest_batch        # Batch ingestion (up to 1000)
 GET    /papers/{paper_id}          # Retrieve metadata
 GET    /papers/{paper_id}/fulldata # Retrieve all data
 GET    /papers/stats               # Database statistics
 GET    /papers/allpapers           # List all papers
-
 #+end_src
 ** Search
 #+begin_src 
-
 GET    /search/semantic            # Semantic similarity search
 GET    /search/similar/{paper_id}  # Find similar papers
-
 #+end_src
 
 * Setup
@@ -38,38 +34,37 @@ GET    /search/similar/{paper_id}  # Find similar papers
 
 ** Installation
 1. Clone the repository:
-#+begin_src bash
-git clone https://github.com/Tevqoon/ElPapers
-cd ElPapers
-#+end_src
+    #+begin_src bash
+    git clone https://github.com/Tevqoon/ElPapers
+    cd ElPapers
+    #+end_src
 
 2. Configure your OpenAI key:
-#+begin_src bash
-export OPENAI_API_KEY=your-key-here
-#+end_src
+    #+begin_src bash
+    export OPENAI_API_KEY=your-key-here
+    #+end_src
 
 3. Start the service:
-#+begin_src bash
-docker-compose up -d
-#+end_src
+    #+begin_src bash
+    docker-compose up -d
+    #+end_src
 
 4. Add to your Emacs config:
-#+begin_src emacs-lisp
-(use-package elpapers
-  :after elfeed
-  :demand t
-  :load-path "~/path/to/ElPapers"
-  :bind (:map elfeed-search-mode-map
-         ("V" . elpapers-ingest-full)
-         ("K" . elpapers-semantic-search)
-         :map elfeed-show-mode-map
-         ("V" . elpapers-ingest-full)
-         ("K" . elpapers-semantic-search))
-  :config
-  ;; Enable automatic ingestion for new papers
-  (elpapers-enable-auto-ingest))
-#+end_src
-
+    #+begin_src emacs-lisp
+    (use-package elpapers
+      :after elfeed
+      :demand t
+      :load-path "~/path/to/ElPapers"
+      :bind (:map elfeed-search-mode-map
+             ("V" . elpapers-ingest-full)
+             ("K" . elpapers-semantic-search)
+             :map elfeed-show-mode-map
+             ("V" . elpapers-ingest-full)
+             ("K" . elpapers-semantic-search))
+      :config
+      ;; Enable automatic ingestion for new papers
+      (elpapers-enable-auto-ingest))
+    #+end_src
 
 ** Usage
 *** Ingesting papers
