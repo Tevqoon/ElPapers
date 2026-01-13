@@ -276,6 +276,7 @@ Add to `elfeed-new-entry-hook' for automatic operation."
   (remove-hook 'elfeed-new-entry-hook #'elpapers-auto-ingest-hook)
   (message "ElPapers auto-ingest disabled"))
 
+(require 'elpapers-api)
 (provide 'elpapers)
 
 ;;; elpapers.el ends here
